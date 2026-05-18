@@ -17,11 +17,7 @@ from aiogram.types import (
 TOKEN = "8567616083:AAHFlvVNPm9hClfUOQpDBB4RxRN1MdiwfzA"
 ADMIN_ID = 8465432674
 
-DB_FOLDER = "/storage/emulated/0/боты/ClickerBot"
-
-os.makedirs(DB_FOLDER, exist_ok=True)
-
-DB_PATH = f"{DB_FOLDER}/game.db"
+DB_PATH = "game.db"
 
 EVENT_MULTIPLIER = 1
 
