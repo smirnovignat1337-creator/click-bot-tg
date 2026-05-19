@@ -2,6 +2,7 @@ import asyncio
 import random
 import aiosqlite
 import os
+import asyncpg
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
