@@ -140,10 +140,8 @@ def menu():
                 InlineKeyboardButton(
                     text="🎰 Казино",
                     callback_data="casino"
-                )
-            ],
-
-            [
+                ),
+                
                 InlineKeyboardButton(
                     text="🎁 Промокод",
                     callback_data="promo_menu"
