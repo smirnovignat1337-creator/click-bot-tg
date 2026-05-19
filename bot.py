@@ -159,8 +159,12 @@ def menu():
                 InlineKeyboardButton(
                     text="🏆 Топ",
                     callback_data="top"
+                ),
+                InlineKeyboardButton
+                    text="💸 Перевести", 
+                    callback_data="pay"
                 )
-            ]
+            ]        
         ]
     )
 
@@ -904,6 +908,108 @@ async def removemoney(message: Message):
     await message.answer(
         "✅ Деньги забраны"
     )
+
+@dp.message(Command("pay"))
+async def pay_command(message: Message):
+    args = message.text.split()
+
+    # Проверка формата команды
+    if len(args) != 3:
+        await message.answer(
+            "❌ Использование:\n"
+            "/pay ID сумма\n\n"
+            "Пример:\n"
+            "/pay 123456789 100000"
+        )
+        return
+
+    # Проверяем ID
+    try:
+        target_id = int(args[1])
+    except ValueError:
+        await message.answer("❌ Неверный ID игрока.")
+        return
+
+    # Проверяем сумму
+    try:
+        amount = int(args[2])
+    except ValueError:
+        await message.answer("❌ Сумма должна быть числом.")
+        return
+
+    if amount <= 0:
+        await message.answer("❌ Сумма должна быть больше 0.")
+        return
+
+    sender_id = message.from_user.id
+
+    # Нельзя переводить самому себе
+    if sender_id == target_id:
+        await message.answer("❌ Нельзя переводить деньги самому себе.")
+        return
+
+    async with aiosqlite.connect(DB_PATH) as db:
+
+        # Получаем баланс отправителя
+        cursor = await db.execute(
+            "SELECT money FROM users WHERE user_id = ?",
+            (sender_id,)
+        )
+        sender = await cursor.fetchone()
+
+        if not sender:
+            await message.answer("❌ Ваш профиль не найден.")
+            return
+
+        sender_money = sender[0]
+
+        # Проверяем баланс
+        if sender_money < amount:
+            await message.answer("❌ Недостаточно средств.")
+            return
+
+        # Проверяем существование получателя
+        cursor = await db.execute(
+            "SELECT user_id FROM users WHERE user_id = ?",
+            (target_id,)
+        )
+        target = await cursor.fetchone()
+
+        if not target:
+            await message.answer(
+                "❌ Получатель не найден.\n"
+                "Он должен хотя бы один раз запустить бота."
+            )
+            return
+
+        # Списываем деньги у отправителя
+        await db.execute(
+            "UPDATE users SET money = money - ? WHERE user_id = ?",
+            (amount, sender_id)
+        )
+
+        # Начисляем деньги получателю
+        await db.execute(
+            "UPDATE users SET money = money + ? WHERE user_id = ?",
+            (amount, target_id)
+        )
+
+        await db.commit()
+
+    # Сообщение отправителю
+    await message.answer(
+        f"✅ Вы успешно перевели {format_number(amount)} монет игроку `{target_id}`",
+        parse_mode="Markdown"
+    )
+
+    # Уведомление получателю
+    try:
+        await bot.send_message(
+            target_id,
+            f"💸 Вам перевели {format_number(amount)} монет!"
+        )
+    except:
+        pass
     
 # ================= AUTO FARM =================
 
@@ -936,6 +1042,17 @@ async def auto_farm():
             await db.commit()
 
         await asyncio.sleep(5)
+
+@dp.callback_query(F.data == "pay")
+async def pay_button(callback: CallbackQuery):
+    await callback.message.answer(
+        "💸 Перевод денег\n\n"
+        "Используйте команду:\n"
+        "/pay ID сумма\n\n"
+        "Пример:\n"
+        "/pay 123456789 100000"
+    )
+    await callback.answer()
 
 # ================= MAIN =================
 
