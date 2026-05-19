@@ -165,33 +165,6 @@ def menu():
         ]
     )
 
-# ================= TOP =================
-
-@dp.callback_query(F.data == "top")
-async def top(callback: CallbackQuery):
-
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        cursor = await db.execute("""
-        SELECT user_id, money
-        FROM users
-        ORDER BY money DESC
-        LIMIT 10
-        """)
-
-        users = await cursor.fetchall()
-
-    text = "🏆 ТОП ИГРОКОВ\n\n"
-
-    for i, user in enumerate(users, start=1):
-
-        text += f"{i}. ID {user[0]} — {user[1]} 💰\n"
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=menu()
-    )
-
 # ================= START =================
 
 @dp.message(Command("start"))
@@ -221,6 +194,131 @@ async def profile(callback: CallbackQuery):
         f"💎 VIP: {vip}",
         reply_markup=menu()
     )
+
+# ================= CLICK =================
+
+@dp.callback_query(F.data == "click")
+async def click(callback: CallbackQuery):
+    global EVENT_MULTIPLIER
+
+    user_id = callback.from_user.id
+    money, power, autoclick, vip = await get_user(user_id)
+
+    vip_bonus = vip_multiplier(vip)
+    earn = power * vip_bonus * EVENT_MULTIPLIER
+
+    await db.execute("""
+        UPDATE users
+        SET money = money + $1
+        WHERE user_id = $2
+    """, earn, user_id)
+
+    money, power, autoclick, vip = await get_user(user_id)
+
+    await callback.message.edit_text(
+        f"💰 +{earn} монет\n\n"
+        f"💵 Баланс: {money}\n"
+        f"⚡ Сила: {power}\n"
+        f"💎 VIP x{vip_bonus}\n"
+        f"🎉 EVENT x{EVENT_MULTIPLIER}",
+        reply_markup=menu()
+    )
+
+    await callback.answer()
+
+
+# ================= UPGRADE =================
+
+@dp.callback_query(F.data == "upgrade")
+async def upgrade(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    money, power, autoclick, vip = await get_user(user_id)
+
+    price = power * 50
+
+    if money >= price:
+        await db.execute("""
+            UPDATE users
+            SET money = money - $1,
+                power = power + 1
+            WHERE user_id = $2
+        """, price, user_id)
+
+        money, power, autoclick, vip = await get_user(user_id)
+
+        text = (
+            f"🚀 Улучшение куплено!\n\n"
+            f"⚡ Сила: {power}\n"
+            f"💰 Баланс: {money}"
+        )
+    else:
+        text = f"❌ Нужно {price} монет"
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=menu()
+    )
+
+    await callback.answer()
+
+
+# ================= AUTOCLICK =================
+
+@dp.callback_query(F.data == "autoclick")
+async def autoclick(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    money, power, autoclick_level, vip = await get_user(user_id)
+
+    price = (autoclick_level + 1) * 200
+
+    if money >= price:
+        await db.execute("""
+            UPDATE users
+            SET money = money - $1,
+                autoclick = autoclick + 1
+            WHERE user_id = $2
+        """, price, user_id)
+
+        money, power, autoclick_level, vip = await get_user(user_id)
+
+        text = (
+            f"🤖 Автоклик улучшен!\n\n"
+            f"🤖 Уровень: {autoclick_level}\n"
+            f"💰 Баланс: {money}"
+        )
+    else:
+        text = f"❌ Нужно {price} монет"
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=menu()
+    )
+
+    await callback.answer()
+
+
+# ================= TOP =================
+
+@dp.callback_query(F.data == "top")
+async def top(callback: CallbackQuery):
+    rows = await db.fetch("""
+        SELECT user_id, money
+        FROM users
+        ORDER BY money DESC
+        LIMIT 10
+    """)
+
+    text = "🏆 ТОП ИГРОКОВ\n\n"
+
+    for i, row in enumerate(rows, start=1):
+        text += f"{i}. ID {row['user_id']} — {row['money']} 💰\n"
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=menu()
+    )
+
+    await callback.answer()
 
 # ================= CASINO =================
 
