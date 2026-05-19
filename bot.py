@@ -160,7 +160,7 @@ def menu():
                     text="🏆 Топ",
                     callback_data="top"
                 ),
-                InlineKeyboardButton
+                InlineKeyboardButton(
                     text="💸 Перевести", 
                     callback_data="pay"
                 )
