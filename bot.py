@@ -165,6 +165,33 @@ def menu():
         ]
     )
 
+# ================= TOP =================
+
+@dp.callback_query(F.data == "top")
+async def top(callback: CallbackQuery):
+
+    async with aiosqlite.connect(DB_PATH) as db:
+
+        cursor = await db.execute("""
+        SELECT user_id, money
+        FROM users
+        ORDER BY money DESC
+        LIMIT 10
+        """)
+
+        users = await cursor.fetchall()
+
+    text = "🏆 ТОП ИГРОКОВ\n\n"
+
+    for i, user in enumerate(users, start=1):
+
+        text += f"{i}. ID {user[0]} — {user[1]} 💰\n"
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=menu()
+    )
+
 # ================= START =================
 
 @dp.message(Command("start"))
