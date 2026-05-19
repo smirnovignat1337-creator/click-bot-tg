@@ -31,7 +31,10 @@ db = None
 
 async def db_start():
     global db
-    db = await asyncpg.connect(os.getenv("DATABASE_URL"))
+    db = await asyncpg.connect(
+        os.getenv("DATABASE_URL"),
+        ssl="require"
+    )
 
     # USERS
     await db.execute("""
