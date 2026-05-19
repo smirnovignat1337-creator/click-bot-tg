@@ -30,8 +30,13 @@ db = None
 async def db_start():
     global db
 
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise ValueError("DATABASE_URL не найден в Variables Railway")
+
     db = await asyncpg.connect(
-        os.getenv("DATABASE_URL"),
+        database_url,
         ssl="require"
     )
 
