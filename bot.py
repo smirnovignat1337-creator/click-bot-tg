@@ -1,6 +1,5 @@
 import asyncio
 import random
-import aiosqlite
 import os
 import asyncpg
 
@@ -948,7 +947,6 @@ async def main():
     asyncio.create_task(auto_farm())
 
     print("Бот запущен")
-    print(f"База данных: {DB_PATH}")
 
     await dp.start_polling(bot)
 
