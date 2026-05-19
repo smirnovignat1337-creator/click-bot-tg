@@ -26,74 +26,65 @@ dp = Dispatcher()
 
 # ================= DATABASE =================
 
+db = None
+
 async def db_start():
+    global db
+    db = await asyncpg.connect(os.getenv("DATABASE_URL"))
 
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        # USERS
-
-        await db.execute("""
+    # USERS
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            money INTEGER DEFAULT 0,
-            power INTEGER DEFAULT 1,
-            autoclick INTEGER DEFAULT 0,
-            vip INTEGER DEFAULT 0
+            user_id BIGINT PRIMARY KEY,
+            money BIGINT DEFAULT 0,
+            power BIGINT DEFAULT 1,
+            autoclick BIGINT DEFAULT 0,
+            vip BIGINT DEFAULT 0
         )
-        """)
+    """)
 
-        # PROMOCODES
-
-        await db.execute("""
+    # PROMOCODES
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS promocodes (
             code TEXT PRIMARY KEY,
-            reward INTEGER,
-            activations INTEGER
+            reward BIGINT,
+            activations BIGINT
         )
-        """)
+    """)
 
-        # PROMO USES
-
-        await db.execute("""
+    # PROMO USES
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS promo_uses (
-            user_id INTEGER,
+            user_id BIGINT,
             code TEXT
         )
-        """)
+    """)
 
-        await db.commit()
 
 async def create_user(user_id):
+    await db.execute("""
+        INSERT INTO users (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+    """, user_id)
 
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        cursor = await db.execute(
-            "SELECT * FROM users WHERE user_id = ?",
-            (user_id,)
-        )
-
-        user = await cursor.fetchone()
-
-        if user is None:
-
-            await db.execute("""
-            INSERT INTO users (user_id)
-            VALUES (?)
-            """, (user_id,))
-
-            await db.commit()
 
 async def get_user(user_id):
-
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        cursor = await db.execute("""
+    user = await db.fetchrow("""
         SELECT money, power, autoclick, vip
         FROM users
-        WHERE user_id = ?
-        """, (user_id,))
+        WHERE user_id = $1
+    """, user_id)
 
-        return await cursor.fetchone()
+    if user:
+        return (
+            user["money"],
+            user["power"],
+            user["autoclick"],
+            user["vip"]
+        )
+
+    return None
 
 # ================= VIP =================
 
