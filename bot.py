@@ -2,6 +2,7 @@ import asyncio
 import random
 import aiosqlite
 import os
+import asyncpg
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -14,14 +15,8 @@ from aiogram.types import (
 
 # ================= CONFIG =================
 
-TOKEN = "8567616083:AAHFlvVNPm9hClfUOQpDBB4RxRN1MdiwfzA"
+TOKEN = os.getenv("BOT_TOKEN") or "8567616083:AAHFlvVNPm9hClfUOQpDBB4RxRN1MdiwfzA"
 ADMIN_ID = 8465432674
-
-DB_FOLDER = "/storage/emulated/0/боты/ClickerBot"
-
-os.makedirs(DB_FOLDER, exist_ok=True)
-
-DB_PATH = f"{DB_FOLDER}/game.db"
 
 EVENT_MULTIPLIER = 1
 
@@ -30,74 +25,72 @@ dp = Dispatcher()
 
 # ================= DATABASE =================
 
+db = None
+
 async def db_start():
+    global db
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    db = await asyncpg.connect(
+        os.getenv("DATABASE_URL"),
+        ssl="require"
+    )
 
-        # USERS
-
-        await db.execute("""
+    # USERS
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            money INTEGER DEFAULT 0,
-            power INTEGER DEFAULT 1,
-            autoclick INTEGER DEFAULT 0,
-            vip INTEGER DEFAULT 0
+            user_id BIGINT PRIMARY KEY,
+            money BIGINT DEFAULT 0,
+            power BIGINT DEFAULT 1,
+            autoclick BIGINT DEFAULT 0,
+            vip BIGINT DEFAULT 0
         )
-        """)
+    """)
 
-        # PROMOCODES
-
-        await db.execute("""
+    # PROMOCODES
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS promocodes (
             code TEXT PRIMARY KEY,
-            reward INTEGER,
-            activations INTEGER
+            reward BIGINT,
+            activations BIGINT
         )
-        """)
+    """)
 
-        # PROMO USES
-
-        await db.execute("""
+    # PROMO USES
+    await db.execute("""
         CREATE TABLE IF NOT EXISTS promo_uses (
-            user_id INTEGER,
-            code TEXT
+            user_id BIGINT,
+            code TEXT,
+            PRIMARY KEY (user_id, code)
         )
-        """)
+    """)
 
-        await db.commit()
 
 async def create_user(user_id):
+    await db.execute("""
+        INSERT INTO users (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+    """, user_id)
 
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        cursor = await db.execute(
-            "SELECT * FROM users WHERE user_id = ?",
-            (user_id,)
-        )
-
-        user = await cursor.fetchone()
-
-        if user is None:
-
-            await db.execute("""
-            INSERT INTO users (user_id)
-            VALUES (?)
-            """, (user_id,))
-
-            await db.commit()
 
 async def get_user(user_id):
+    await create_user(user_id)
 
-    async with aiosqlite.connect(DB_PATH) as db:
-
-        cursor = await db.execute("""
+    row = await db.fetchrow("""
         SELECT money, power, autoclick, vip
         FROM users
-        WHERE user_id = ?
-        """, (user_id,))
+        WHERE user_id = $1
+    """, user_id)
 
-        return await cursor.fetchone()
+    if row:
+        return (
+            row["money"],
+            row["power"],
+            row["autoclick"],
+            row["vip"]
+        )
+
+    return (0, 1, 0, 0)
 
 # ================= VIP =================
 
