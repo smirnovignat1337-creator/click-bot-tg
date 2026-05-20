@@ -324,83 +324,64 @@ async def top(callback: CallbackQuery):
 
 @dp.message(Command("casino"))
 async def casino(message: Message):
-
     args = message.text.split()
 
     if len(args) != 2:
-
         await message.answer(
             "🎰 Использование:\n"
             "/casino ставка"
         )
-
         return
 
     user_id = message.from_user.id
 
     try:
         bet = int(args[1])
-
     except:
-
         await message.answer(
             "❌ Ставка должна быть числом"
         )
-
         return
 
     if bet <= 0:
-
         await message.answer(
             "❌ Ставка должна быть больше 0"
         )
-
         return
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    money, power, autoclick, vip = await get_user(user_id)
 
-        user = await get_user(user_id)
+    if money < bet:
+        await message.answer(
+            "❌ Недостаточно монет"
+        )
+        return
 
-        money, power, autoclick, vip = user
+    # ШАНС ВЫИГРЫША 20%
+    if random.randint(1, 100) <= 20:
+        win = bet * 2
+        money += win
 
-        if money < bet:
+        text = (
+            f"🎰 ВЫ ВЫИГРАЛИ!\n\n"
+            f"💰 Ставка: {bet}\n"
+            f"🔥 Выигрыш: {win}\n"
+            f"💵 Баланс: {money}"
+        )
+    else:
+        money -= bet
 
-            await message.answer(
-                "❌ Недостаточно монет"
-            )
+        text = (
+            f"💀 ВЫ ПРОИГРАЛИ\n\n"
+            f"💸 Потеряно: {bet}\n"
+            f"💵 Баланс: {money}"
+        )
 
-            return
-
-        # ШАНС ВЫИГРЫША
-
-        if random.randint(1, 100) <= 20:
-
-            win = bet * 2
-
-            money += win
-
-            text = (
-                f"🎰 ВЫ ВЫИГРАЛИ!\n\n"
-                f"💰 Ставка: {bet}\n"
-                f"🔥 Выигрыш: {win}"
-            )
-
-        else:
-
-            money -= bet
-
-            text = (
-                f"💀 ВЫ ПРОИГРАЛИ\n\n"
-                f"💸 Потеряно: {bet}"
-            )
-
-        await db.execute("""
+    await db.execute("""
         UPDATE users
-        SET money = ?
-        WHERE user_id = ?
-        """, (money, user_id))
-
-        await db.commit()
+        SET money = $1
+        WHERE user_id = $2
+    """, money, user_id)
 
     await message.answer(text)
 
