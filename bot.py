@@ -349,6 +349,7 @@ async def casino(message: Message):
         )
         return
 
+    # Получаем данные пользователя (и создаем его при необходимости)
     money, power, autoclick, vip = await get_user(user_id)
 
     if money < bet:
@@ -357,7 +358,7 @@ async def casino(message: Message):
         )
         return
 
-    # ШАНС ВЫИГРЫША 20%
+    # Шанс выигрыша 20%
     if random.randint(1, 100) <= 20:
         win = bet * 2
         money += win
@@ -377,6 +378,7 @@ async def casino(message: Message):
             f"💵 Баланс: {money}"
         )
 
+    # Сохраняем новый баланс
     await db.execute("""
         UPDATE users
         SET money = $1
