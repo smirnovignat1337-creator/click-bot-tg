@@ -447,87 +447,72 @@ async def createpromo(message: Message):
         f"✅ Промокод {code} создан"
     )
 
-# ================= PROMO =================
-
 @dp.message(Command("promo"))
 async def promo(message: Message):
-
     args = message.text.split()
 
     if len(args) != 2:
-
         await message.answer("/promo code")
         return
 
     user_id = message.from_user.id
     code = args[1].lower()
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    # Создаём пользователя, если его ещё нет
+    await create_user(user_id)
 
-        cursor = await db.execute("""
+    # Ищем промокод
+    promo_row = await db.fetchrow("""
         SELECT reward, activations
         FROM promocodes
-        WHERE code = ?
-        """, (code,))
+        WHERE code = $1
+    """, code)
 
-        promo = await cursor.fetchone()
+    if promo_row is None:
+        await message.answer("❌ Промокод не найден")
+        return
 
-        if promo is None:
+    reward = promo_row["reward"]
+    activations = promo_row["activations"]
 
-            await message.answer(
-                "❌ Промокод не найден"
-            )
-
-            return
-
-        reward, activations = promo
-
-        cursor = await db.execute("""
-        SELECT *
+    # Проверяем, использовал ли пользователь этот промокод
+    used = await db.fetchrow("""
+        SELECT 1
         FROM promo_uses
-        WHERE user_id = ? AND code = ?
-        """, (user_id, code))
+        WHERE user_id = $1 AND code = $2
+    """, user_id, code)
 
-        used = await cursor.fetchone()
+    if used is not None:
+        await message.answer("❌ Вы уже использовали этот промокод")
+        return
 
-        if used is not None:
-
-            await message.answer(
-                "❌ Вы уже использовали этот промокод"
-            )
-
-            return
-
-        await db.execute("""
+    # Начисляем награду
+    await db.execute("""
         UPDATE users
-        SET money = money + ?
-        WHERE user_id = ?
-        """, (reward, user_id))
+        SET money = money + $1
+        WHERE user_id = $2
+    """, reward, user_id)
 
+    # Записываем использование промокода
+    await db.execute("""
+        INSERT INTO promo_uses (user_id, code)
+        VALUES ($1, $2)
+    """, user_id, code)
+
+    # Уменьшаем количество активаций
+    activations -= 1
+
+    if activations <= 0:
         await db.execute("""
-        INSERT INTO promo_uses
-        (user_id, code)
-        VALUES (?, ?)
-        """, (user_id, code))
-
-        activations -= 1
-
-        if activations <= 0:
-
-            await db.execute("""
             DELETE FROM promocodes
-            WHERE code = ?
-            """, (code,))
-
-        else:
-
-            await db.execute("""
+            WHERE code = $1
+        """, code)
+    else:
+        await db.execute("""
             UPDATE promocodes
-            SET activations = ?
-            WHERE code = ?
-            """, (activations, code))
-
-        await db.commit()
+            SET activations = $1
+            WHERE code = $2
+        """, activations, code)
 
     await message.answer(
         f"🎁 Промокод активирован!\n\n"
